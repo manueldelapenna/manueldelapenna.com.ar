@@ -1,8 +1,16 @@
 ﻿<?php
+//SMTP needs accurate times, and the PHP time zone MUST be set
+//This should be done in your php.ini, but this is how to do it if you don't have access to that
+require '../PHPMailer/PHPMailerAutoload.php';
 
-// Replace this with your own email address
-$siteOwnersEmail = 'manueldelapenna@gmail.com';
+$myGmailEmail = "";
+$myPassword = "";
+$myName = "";
 
+if(empty($myGmailEmail) || empty($myPassword) || empty($myName)){
+	echo "Falta configurar email";
+	die;
+}
 
 if($_POST) {
 
@@ -11,46 +19,76 @@ if($_POST) {
    $subject = trim(stripslashes($_POST['contactSubject']));
    $contact_message = trim(stripslashes($_POST['contactMessage']));
 
+   $error = array();
+   
    // Check Name
 	if (strlen($name) < 2) {
-		$error['name'] = "Please enter your name.";
+		$error['name'] = "Ingrese su nombre.";
 	}
 	// Check Email
 	if (!preg_match('/^[a-z0-9&\'\.\-_\+]+@[a-z0-9\-]+\.([a-z0-9\-]+\.)*+[a-z]{2}/is', $email)) {
-		$error['email'] = "Please enter a valid email address.";
+		$error['email'] = "Ingrese un email válido";
 	}
 	// Check Message
 	if (strlen($contact_message) < 15) {
-		$error['message'] = "Please enter your message. It should have at least 15 characters.";
+		$error['message'] = "Por favor ingrese un mensaje de al menos 15 caracteres";
 	}
    // Subject
-	if ($subject == '') { $subject = "Contact Form Submission"; }
+	if ($subject == '') { $subject = "Consulta desde sitio Web"; }
 
+	if (!$error) {
 
-   // Set Message
-   $message .= "Email from: " . $name . "<br />";
-	$message .= "Email address: " . $email . "<br />";
-   $message .= "Message: <br />";
-   $message .= $contact_message;
-   $message .= "<br /> ----- <br /> This email was sent from your site's contact form. <br />";
+		date_default_timezone_set('Etc/UTC');
+		//Create a new PHPMailer instance
+		$mail = new PHPMailer;
+		//Tell PHPMailer to use SMTP
+		$mail->isSMTP();
+		//Enable SMTP debugging
+		// 0 = off (for production use)
+		// 1 = client messages
+		// 2 = client and server messages
+		$mail->SMTPDebug = 0;
+		//Ask for HTML-friendly debug output
+		$mail->Debugoutput = 'html';
+		//Set the hostname of the mail server
+		$mail->Host = 'smtp.gmail.com';
+		// use
+		// $mail->Host = gethostbyname('smtp.gmail.com');
+		// if your network does not support SMTP over IPv6
+		//Set the SMTP port number - 587 for authenticated TLS, a.k.a. RFC4409 SMTP submission
+		$mail->Port = 587;
+		//Set the encryption system to use - ssl (deprecated) or tls
+		$mail->SMTPSecure = 'tls';
+		//Whether to use SMTP authentication
+		$mail->SMTPAuth = true;
+		//Username to use for SMTP authentication - use full email address for gmail
+		$mail->Username = $myGmailEmail;
+		//Password to use for SMTP authentication
+		$mail->Password = $myPassword;
+		//Set who the message is to be sent from
+		$mail->setFrom($myGmailEmail, 'Formulario Web');
+		//Set an alternative reply-to address
+		$mail->addReplyTo($email, $name);
+		//Set who the message is to be sent to
+		$mail->addAddress($myGmailEmail, $myName);
+		//Set the subject line
+		$mail->Subject = $subject;
+		//Read an HTML message body from an external file, convert referenced images to embedded,
+		//convert HTML into a basic plain-text alternative body
+		$mail->isHTML(false);
 
-   // Set From: header
-   $from =  $name . " <" . $email . ">";
-
-   // Email Headers
-	$headers = "From: " . $from . "\r\n";
-	$headers .= "Reply-To: ". $email . "\r\n";
- 	$headers .= "MIME-Version: 1.0\r\n";
-	$headers .= "Content-Type: text/html; charset=ISO-8859-1\r\n";
-
-
-   if (!$error) {
-
-      ini_set("sendmail_from", $siteOwnersEmail); // for windows server
-      $mail = mail($siteOwnersEmail, $subject, $message, $headers);
-
-		if ($mail) { echo "OK"; }
-      else { echo "Something went wrong. Please try again."; }
+		$mail->Body = $contact_message;
+					
+		//send the message, check for errors
+		if (!$mail->send()) {
+			$errorMsg = "El mensaje no pudo ser enviado, mande un email a $myGmailEmail. ";
+			if($mail->SMTPDebug){
+				$errorMsg.= $mail->ErrorInfo;
+			}
+			echo $errorMsg;
+		} else {
+			echo "OK";
+		}
 		
 	} # end if - no validation error
 
